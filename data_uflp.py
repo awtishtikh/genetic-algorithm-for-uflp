@@ -1,4 +1,5 @@
 import numpy as np
+np.random.seed(1234)
 
 setup_costs = [37, 62, 75, 93, 43, 69, 33, 45, 88, 35, 77, 36, 88, 43, 21, 42, 53, 24, 14, 21]
 transportation_costs = [
@@ -40,7 +41,7 @@ transportation_costs = [
     [49, 35, 1, 12, 4, 39, 7, 36, 18, 42, 43, 5, 5, 37, 38, 33, 7, 23, 44, 46]
 ]
 
-np.random.seed(1234)
+
 
 
 def generate_data(num_facilities, num_customers):
@@ -51,12 +52,3 @@ def generate_data(num_facilities, num_customers):
 
 
 ga_facility_costs, ga_distances = generate_data(20, 200)
- # = generate_data(50, 500)[1]
-# print(ga_facility_costs)
-# print(ga_distances)
-#
-pulp_facility_costs = ga_facility_costs.tolist()
-pulp_distances = ga_distances.tolist()
-
-# print(ga_distances)
-# print(pulp_distances)
