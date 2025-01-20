@@ -1,35 +1,24 @@
 import numpy as np
 import random
-from data_uflp import ga_distances, ga_facility_costs
+import matplotlib.pyplot as plt
 from tqdm import tqdm
-
-
-# Assuming ga_facility_costs and ga_distances are loaded externally, but we'll also handle default generation
-def generate_data(num_facilities, num_customers):
-    """Generate random data for facility costs and customer distances."""
-    facility_costs = np.random.randint(10, 100, size=num_facilities)
-    distances = np.random.randint(1, 50, size=(num_customers, num_facilities))
-    return facility_costs, distances
+from data_uflp import ga_distances, ga_facility_costs
 
 
 def calculate_cost(facility_state, facility_costs, distances):
     """Calculate the total cost for a given facility state."""
     if len(facility_state) != distances.shape[1]:
         raise ValueError("Mismatch between facility_state length and distances columns.")
-
     if len(facility_costs) != distances.shape[1]:
         raise ValueError("Mismatch between facility_costs length and distances columns.")
-
     if not any(facility_state):
         return float('inf')  # Invalid solution (no facility open)
 
     assignment_cost = 0
     for customer_idx in range(distances.shape[0]):
-        # Assign each customer to the nearest open facility
         open_facilities = np.where(facility_state == 1)[0]
         if len(open_facilities) == 0:
             return float('inf')  # No facility is open
-
         customer_distances = distances[customer_idx, open_facilities]
         assignment_cost += np.min(customer_distances)
 
@@ -51,10 +40,10 @@ def select_parents(population, costs):
 
 
 def crossover(parent1, parent2):
-    """Perform one-point crossover."""
-    point = random.randint(1, len(parent1) - 1)
-    child1 = np.concatenate((parent1[:point], parent2[point:]))
-    child2 = np.concatenate((parent2[:point], parent1[point:]))
+    """Perform uniform crossover."""
+    mask = np.random.randint(0, 2, size=len(parent1))
+    child1 = np.where(mask == 1, parent1, parent2)
+    child2 = np.where(mask == 0, parent1, parent2)
     return child1, child2
 
 
@@ -68,40 +57,39 @@ def mutate(solution, mutation_rate):
 
 def genetic_algorithm(num_facilities, num_customers, pop_size, generations, mutation_rate):
     """Solve UFLP using Genetic Algorithm."""
-    # Load data
-    facility_costs, distances = ga_facility_costs, ga_distances
+    # Generate data
+    facility_costs = ga_facility_costs
+    distances = ga_distances
 
     population = initialize_population(pop_size, num_facilities)
     global_best_solution = None
     global_best_cost = float("inf")
     best_generation = None
 
-    for generation in tqdm(range(generations)):
-        # Create new population
-        new_population = []
+    best_fitness = []
+    avg_fitness = []
 
+    for generation in tqdm(range(generations)):
         # Calculate costs
         costs = [calculate_cost(ind, facility_costs, distances) for ind in population]
-        fitness = [5000 / (np.sqrt(cost) + 0.005) for cost in costs]
+        fitness = [-cost for cost in costs]  # Negative costs as we minimize
 
-        # Selection process
-        for idx, fit in enumerate(fitness):
-            u = np.random.uniform(0, 1)
-            selection_prob = fit / sum(fitness)
-            if selection_prob >= u:
-                new_population.append(population[idx])
+        # Record fitness statistics
+        best_fitness.append(-min(fitness))
+        avg_fitness.append(-np.mean(fitness))
 
-        # Record the best solution
+        # Elitism: Keep the best solution
         best_idx = np.argmin(costs)
         best_solution = population[best_idx]
         best_cost = costs[best_idx]
-        if best_cost <= global_best_cost:
+        if best_cost < global_best_cost:
             global_best_cost = best_cost
             global_best_solution = best_solution
             best_generation = generation
 
-        print(f"Generation {generation}: Best Cost = {best_cost}")
+        new_population = [best_solution]  # Start with the elite
 
+        # Generate offspring
         while len(new_population) < pop_size:
             parent1, parent2 = select_parents(population, costs)
             child1, child2 = crossover(parent1, parent2)
@@ -110,23 +98,35 @@ def genetic_algorithm(num_facilities, num_customers, pop_size, generations, muta
             new_population.extend([child1, child2])
 
         # Ensure population size consistency
-        population = new_population
+        population = new_population[:pop_size]
 
-    # Return the best solution and cost
+        # Reduce mutation rate over generations
+        mutation_rate *= 0.99
+
+    # Plot fitness over generations
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(generations), best_fitness, label="Best Fitness")
+    plt.plot(range(generations), avg_fitness, label="Average Fitness")
+    plt.xlabel("Generation")
+    plt.ylabel("Fitness (Negative Cost)")
+    plt.title("Fitness Over Generations")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
     return global_best_solution, global_best_cost, best_generation, facility_costs, distances
 
 
 if __name__ == "__main__":
-    num_facilities = 20
-    num_customers = 50
+    num_facilities = len(ga_facility_costs)
+    num_customers = len(ga_distances)
     pop_size = 50
     generations = 100
     mutation_rate = 0.1
 
-    best_solution, best_cost, generation, costs, distances = genetic_algorithm(num_facilities, num_customers, pop_size,
-                                                                               generations, mutation_rate)
+    best_solution, best_cost, generation, costs, distances = genetic_algorithm(
+        num_facilities, num_customers, pop_size, generations, mutation_rate)
+
     print("Best Facility State:", best_solution)
     print("Minimum Cost:", best_cost)
     print("Best Generation:", generation)
-    print(costs)
-    print(distances)
